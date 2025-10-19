@@ -2,6 +2,7 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+from matplotlib.ticker import MultipleLocator
 
 # --- 1. Relay Constants (Translated from JavaScript) ---
 # Formula: t = TMS * [ A / ((PSM)^P - 1) ]
@@ -118,10 +119,16 @@ st.header(f"Characteristic Curve: {curve['name']}")
 # Define plot ranges in Amperes based on I_pickup
 min_psm_limit = 1.1 # Ensures PSM > 1.0
 max_psm_limit = 10.0 # Common max limit for plotting IDMT curves
-max_time_plot = 1.5 # Max time for the y-axis (1500 ms = 1.5 s)
+
+# ADJUSTMENT 1: Max time for the y-axis (1000 ms = 1.0 s)
+max_time_plot = 1.0 # Max time for the y-axis (1000 ms = 1.0 s)
 
 min_current_plot = i_pickup * min_psm_limit
-max_current_plot = i_pickup * max_psm_limit 
+
+# ADJUSTMENT 2: Hard limit of 1000 A for the X-axis maximum
+max_current_plot_calc = i_pickup * max_psm_limit 
+max_current_plot_limit = 1000.0 # User requested limit
+max_current_plot = min(max_current_plot_calc, max_current_plot_limit)
 
 # Generate I_fault points for the curve plot
 current_values = np.linspace(min_current_plot, max_current_plot, 100)
@@ -158,7 +165,7 @@ if psm_test > 1.0:
             label="Test Fault Point")
     
     # Add annotation for the Current/Time
-    if plot_current < max_current_plot and trip_time_to_plot_ms < max_time_plot * 1000:
+    if plot_current <= max_current_plot and trip_time_to_plot_ms < max_time_plot * 1000:
         ax.annotate(
             f'{i_fault:.0f} A',
             (plot_current, trip_time_to_plot_ms),
@@ -176,8 +183,16 @@ ax.set_xlabel("Fault Current ($I_{fault}$, A)", fontsize=12)
 ax.set_ylabel("Operating Time (ms)", fontsize=12)
 
 # Set axis limits
-ax.set_xlim(min_current_plot, max_current_plot)
+x_lim_max = max(max_current_plot, min_current_plot + 100) # Ensure a minimum visible plot width
+ax.set_xlim(min_current_plot, x_lim_max)
 ax.set_ylim(0, max_time_plot * 1000)
+
+# ADJUSTMENT 3: Add finer major and minor divisions/ticks
+ax.xaxis.set_major_locator(MultipleLocator(200)) # Major ticks every 200 A
+ax.xaxis.set_minor_locator(MultipleLocator(50))  # Minor ticks every 50 A
+
+ax.yaxis.set_major_locator(MultipleLocator(200)) # Major ticks every 200 ms
+ax.yaxis.set_minor_locator(MultipleLocator(50))  # Minor ticks every 50 ms
 
 ax.grid(True, linestyle='--', alpha=0.6)
 ax.legend()
