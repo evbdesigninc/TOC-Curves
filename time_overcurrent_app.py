@@ -67,7 +67,6 @@ with st.sidebar:
     )
 
     # Time Multiplier Setting (TMS)
-    # Using the adjusted range for better visualization of fast trips
     tms = st.slider(
         "Time Multiplier Setting (TMS):",
         min_value=0.05, 
@@ -88,13 +87,12 @@ with st.sidebar:
         key="fault_current_input"
     )
 
-# --- 5. Main Calculation and Results ---
+# --- 5. Main Calculation and Results (Condensed) ---
 
 # Calculate PSM
 psm_test = i_fault / i_pickup
 trip_time_sec = calculate_trip_time(psm_test, tms, curve)
 
-# Display Results (using Streamlit metrics)
 st.subheader("Results for Test Fault")
 col1, col2, col3 = st.columns(3)
 
@@ -102,9 +100,7 @@ col1.metric("Pickup Current", f"{i_pickup:.0f} A")
 col2.metric("Fault Current", f"{i_fault:.0f} A")
 col3.metric("PSM ($I_{fault} / I_{pickup}$)", f"{psm_test:.2f}")
 
-st.divider()
-
-# Display Trip Time Status
+# Display Trip Time Status (Consolidated Block)
 if psm_test <= 1.0:
     st.error("NO TRIP: Fault Current is below Pickup Current.")
 else:
@@ -112,64 +108,75 @@ else:
     if np.isinf(trip_time_sec):
         st.warning("Trip Time is theoretically infinite (PSM is too close to 1.0).")
     else:
-        st.success(f"Trip Time: **{trip_time_ms:,.0f} ms** (or {trip_time_sec:.3f} s)")
+        # Using st.info for a visually clean, compact result
+        st.info(f"Trip Time: **{trip_time_ms:,.0f} ms** (or {trip_time_sec:.3f} s)")
 
-st.divider()
-
-# --- 6. Plotting the Curve ---
+# --- 6. Plotting the Curve (Updated to use Current on X-axis) ---
 
 st.header(f"Characteristic Curve: {curve['name']}")
 
-# Define plot ranges
-min_psm_plot = 1.1
-max_psm_plot = 10.0
-# Max time for the y-axis (1500 ms = 1.5 s, matching the HTML/JS version)
-max_time_plot = 1.5 
+# Define plot ranges in Amperes based on I_pickup
+min_psm_limit = 1.1 # Ensures PSM > 1.0
+max_psm_limit = 10.0 # Common max limit for plotting IDMT curves
+max_time_plot = 1.5 # Max time for the y-axis (1500 ms = 1.5 s)
 
-# Generate PSM points for the curve plot
-psm_values = np.linspace(min_psm_plot, max_psm_plot, 100)
-curve_times = [calculate_trip_time(psm, tms, curve) for psm in psm_values]
+min_current_plot = i_pickup * min_psm_limit
+max_current_plot = i_pickup * max_psm_limit 
+
+# Generate I_fault points for the curve plot
+current_values = np.linspace(min_current_plot, max_current_plot, 100)
+
+# Calculate PSM for each current point
+psm_for_plot = current_values / i_pickup
+
+# Calculate times based on the new PSM values
+curve_times = [calculate_trip_time(psm, tms, curve) for psm in psm_for_plot]
 
 # Clamp curve times to the max plot time
 curve_times_clamped = np.clip(curve_times, a_min=0, a_max=max_time_plot)
 
 
 # Create the plot
-fig, ax = plt.subplots(figsize=(10, 5))
+fig, ax = plt.subplots(figsize=(9, 3.5))
 
-# Plot the IDMT Curve
-ax.plot(psm_values, curve_times_clamped * 1000, 
+# Plot the IDMT Curve (X-axis is now current_values in Amperes)
+ax.plot(current_values, curve_times_clamped * 1000, 
         label=curve["name"], 
         color="#10b981", 
         linewidth=3)
 
 # Plot the specific Test Fault Point
 if psm_test > 1.0:
-    plot_time_ms = min(trip_time_sec, max_time_plot) * 1000
-    plot_psm = min(psm_test, max_psm_plot)
+    trip_time_to_plot_ms = min(trip_time_sec, max_time_plot) * 1000
     
-    ax.plot(plot_psm, plot_time_ms, 'o', 
+    # Clamp I_fault for plotting if it exceeds the max current plot range
+    plot_current = min(i_fault, max_current_plot)
+    
+    ax.plot(plot_current, trip_time_to_plot_ms, 'o', 
             color="#3b82f6", 
             markersize=8, 
             label="Test Fault Point")
     
-    # Add annotation for the PSM/Time if it's within plot bounds
-    if plot_psm < max_psm_plot and plot_time_ms < max_time_plot * 1000:
+    # Add annotation for the Current/Time
+    if plot_current < max_current_plot and trip_time_to_plot_ms < max_time_plot * 1000:
         ax.annotate(
-            f'PSM: {psm_test:.2f}',
-            (plot_psm, plot_time_ms),
+            f'{i_fault:.0f} A',
+            (plot_current, trip_time_to_plot_ms),
             textcoords="offset points",
             xytext=(10, 5),
             ha='center'
         )
 
+# Add a vertical line for the Pickup Current (I_pickup)
+ax.axvline(x=i_pickup, color='r', linestyle='--', label=f'$I_{{pickup}}$ ({i_pickup:.0f} A)')
+
 # Style the plot
-ax.set_title("Operating Time vs. Plug Setting Multiplier (PSM)")
-ax.set_xlabel("PSM (I_fault / I_pickup)", fontsize=12)
+ax.set_title("Operating Time vs. Fault Current (I_fault)")
+ax.set_xlabel("Fault Current ($I_{fault}$, A)", fontsize=12)
 ax.set_ylabel("Operating Time (ms)", fontsize=12)
 
 # Set axis limits
-ax.set_xlim(min_psm_plot, max_psm_plot)
+ax.set_xlim(min_current_plot, max_current_plot)
 ax.set_ylim(0, max_time_plot * 1000)
 
 ax.grid(True, linestyle='--', alpha=0.6)
