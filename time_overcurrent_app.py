@@ -120,8 +120,8 @@ st.header(f"Characteristic Curve: {curve['name']}")
 min_psm_limit = 1.1 # Ensures PSM > 1.0
 max_psm_limit = 10.0 # Common max limit for plotting IDMT curves
 
-# ADJUSTMENT 1: Max time for the y-axis (1000 ms = 1.0 s)
-max_time_plot = 1.0 # Max time for the y-axis (1000 ms = 1.0 s)
+# ADJUSTMENT 1: Max time for the y-axis (INCREASED to 10.0 s or 10000 ms)
+max_time_plot = 10.0 
 
 min_current_plot = i_pickup * min_psm_limit
 
@@ -154,7 +154,9 @@ ax.plot(current_values, curve_times_clamped * 1000,
 
 # Plot the specific Test Fault Point
 if psm_test > 1.0:
-    trip_time_to_plot_ms = min(trip_time_sec, max_time_plot) * 1000
+    # Use the same clamping logic for the single point plot
+    trip_time_to_plot_sec = min(trip_time_sec, max_time_plot)
+    trip_time_to_plot_ms = trip_time_to_plot_sec * 1000
     
     # Clamp I_fault for plotting if it exceeds the max current plot range
     plot_current = min(i_fault, max_current_plot)
@@ -165,6 +167,7 @@ if psm_test > 1.0:
             label="Test Fault Point")
     
     # Add annotation for the Current/Time
+    # Only annotate if the point is within the visible plot boundaries
     if plot_current <= max_current_plot and trip_time_to_plot_ms < max_time_plot * 1000:
         ax.annotate(
             f'{i_fault:.0f} A',
@@ -187,12 +190,12 @@ x_lim_max = max(max_current_plot, min_current_plot + 100) # Ensure a minimum vis
 ax.set_xlim(min_current_plot, x_lim_max)
 ax.set_ylim(0, max_time_plot * 1000)
 
-# ADJUSTMENT 3: Add finer major and minor divisions/ticks
+# ADJUSTMENT 3: Update Y-axis ticks for the new 10-second range
 ax.xaxis.set_major_locator(MultipleLocator(200)) # Major ticks every 200 A
-ax.xaxis.set_minor_locator(MultipleLocator(50))  # Minor ticks every 50 A
+ax.xaxis.set_minor_locator(MultipleLocator(50)) # Minor ticks every 50 A
 
-ax.yaxis.set_major_locator(MultipleLocator(200)) # Major ticks every 200 ms
-ax.yaxis.set_minor_locator(MultipleLocator(50))  # Minor ticks every 50 ms
+ax.yaxis.set_major_locator(MultipleLocator(1000)) # Major ticks every 1000 ms (1 second)
+ax.yaxis.set_minor_locator(MultipleLocator(200)) # Minor ticks every 200 ms
 
 ax.grid(True, linestyle='--', alpha=0.6)
 ax.legend()
