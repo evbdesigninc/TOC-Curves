@@ -149,7 +149,7 @@ curve_times_clamped = np.clip(curve_times, a_min=0, a_max=max_time_plot)
 
 
 # Create the plot
-fig, ax = plt.subplots(figsize=(9, 3.5))
+fig, ax = plt.subplots(figsize=(7, 3)) # MODIFIED: Reduced figure size from (9, 3.5) to (7, 3)
 
 # Plot the IDMT Curve (X-axis is now current_values in Amperes)
 ax.plot(current_values, curve_times_clamped * 1000, 
