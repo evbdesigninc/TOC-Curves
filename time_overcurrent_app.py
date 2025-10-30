@@ -82,7 +82,7 @@ with st.sidebar:
     i_fault = st.slider(
         "Fault Current ($I_{fault}$, A):",
         min_value=1.0, 
-        max_value=5000.0, 
+        max_value=2000.0,  # ADJUSTED: Max fault current set to 2000.0 A
         value=400.0, 
         step=5.0,
         key="fault_current_input"
@@ -125,9 +125,9 @@ max_time_plot = 10.0
 
 min_current_plot = i_pickup * min_psm_limit
 
-# ADJUSTMENT 2: Hard limit of 1000 A for the X-axis maximum
+# ADJUSTMENT 2: Hard limit of 2000 A for the X-axis maximum
 max_current_plot_calc = i_pickup * max_psm_limit 
-max_current_plot_limit = 1000.0 # User requested limit
+max_current_plot_limit = 2000.0 # ADJUSTED: Plot limit changed to 2000.0 A
 max_current_plot = min(max_current_plot_calc, max_current_plot_limit)
 
 # Generate I_fault points for the curve plot
@@ -190,9 +190,10 @@ x_lim_max = max(max_current_plot, min_current_plot + 100) # Ensure a minimum vis
 ax.set_xlim(min_current_plot, x_lim_max)
 ax.set_ylim(0, max_time_plot * 1000)
 
-# ADJUSTMENT 3: Update Y-axis ticks for the new 10-second range
-ax.xaxis.set_major_locator(MultipleLocator(200)) # Major ticks every 200 A
-ax.xaxis.set_minor_locator(MultipleLocator(50)) # Minor ticks every 50 A
+# ADJUSTMENT 3: Update X and Y-axis ticks
+# Changed X-axis major/minor ticks to better fit the new 2000A range (optional, but helpful for 2000A)
+ax.xaxis.set_major_locator(MultipleLocator(400)) # Major ticks every 400 A
+ax.xaxis.set_minor_locator(MultipleLocator(100)) # Minor ticks every 100 A
 
 ax.yaxis.set_major_locator(MultipleLocator(1000)) # Major ticks every 1000 ms (1 second)
 ax.yaxis.set_minor_locator(MultipleLocator(200)) # Minor ticks every 200 ms
