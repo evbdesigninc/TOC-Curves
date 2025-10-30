@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.ticker import MultipleLocator
+import streamlit.components.v1 as components # NEW IMPORT
 
 # --- 1. Relay Constants (Translated from JavaScript) ---
 # Formula: t = TMS * [ A / ((PSM)^P - 1) ]
@@ -41,6 +42,178 @@ st.set_page_config(
 
 st.header("Time-Overcurrent Relay (IDMT) Simulator")
 st.markdown("Use the sidebar to adjust relay settings and visualize the tripping curve.")
+
+# --- 3.1. TTS Component (NEW SECTION) ---
+NARRATIVE_TEXT = """
+Welcome to the Time Overcurrent Relay Simulator. This tool visualizes the inverse definite minimum time, or IDMT, characteristic curve, which is the core of modern power system protection. The curve shows the trip time needed for a given fault current. 
+
+On the vertical axis, you have the operating time in milliseconds, and on the horizontal axis, the fault current in amperes. You can control the two critical settings using the sliders in the sidebar. 
+
+First, the Pickup Current, or I-pickup, defines the minimum current required to start the relay timer. If the fault current is below this value, the relay will not trip. 
+
+Second, the Time Multiplier Setting, or TMS, shifts the curve vertically. A higher TMS means the relay will take longer to trip for any given fault current. 
+
+By changing these sliders, you adjust the coordination time, which is essential for safely isolating faults in the grid.
+"""
+
+TTS_HTML_COMPONENT = f"""
+<audio id="audioPlayer" controls style="width: 100%; display:none; margin-top: 10px;"></audio>
+<button id="narrateButton" 
+        style="padding: 8px 16px; border-radius: 4px; background-color: #10b981; color: white; border: none; cursor: pointer; font-weight: bold;">
+    ▶️ Start Narration
+</button>
+<p id="status" style="margin-top: 5px; font-size: 0.85em; color: #888;">Click to generate narration.</p>
+
+<script>
+    // Constants and Setup
+    const NARRATIVE_TEXT = `{NARRATIVE_TEXT}`;
+    // The API URL is appended with the key during runtime by the environment.
+    const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key='; 
+
+    const button = document.getElementById('narrateButton');
+    const audioPlayer = document.getElementById('audioPlayer');
+    const status = document.getElementById('status');
+    const VOICE_NAME = 'Rasalgethi'; // Knowledgeable voice
+
+    function base64ToArrayBuffer(base64) {{
+        const binaryString = atob(base64);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {{
+            bytes[i] = binaryString.charCodeAt(i);
+        }}
+        return bytes.buffer;
+    }}
+
+    function pcmToWav(pcm16, sampleRate = 16000) {{
+        // API returns signed PCM16 data
+        const numChannels = 1;
+        const bitsPerSample = 16;
+        const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+        const blockAlign = numChannels * (bitsPerSample / 8);
+        const dataSize = pcm16.byteLength;
+        const buffer = new ArrayBuffer(44 + dataSize);
+        const view = new DataView(buffer);
+        let offset = 0;
+
+        // Helper to write string to DataView
+        function writeString(s) {{
+            for (let i = 0; i < s.length; i++) {{
+                view.setUint8(offset + i, s.charCodeAt(i));
+            }}
+            offset += s.length;
+        }}
+
+        // RIFF chunk
+        writeString('RIFF');
+        view.setUint32(offset, 36 + dataSize, true); offset += 4;
+        writeString('WAVE');
+
+        // fmt sub-chunk
+        writeString('fmt ');
+        view.setUint32(offset, 16, true); offset += 4; // Subchunk1Size
+        view.setUint16(offset, 1, true); offset += 2; // AudioFormat (1 for PCM)
+        view.setUint16(offset, numChannels, true); offset += 2; // NumChannels
+        view.setUint32(offset, sampleRate, true); offset += 4; // SampleRate
+        view.setUint32(offset, byteRate, true); offset += 4; // ByteRate
+        view.setUint16(offset, blockAlign, true); offset += 2; // BlockAlign
+        view.setUint16(offset, bitsPerSample, true); offset += 2; // BitsPerSample
+
+        // data sub-chunk
+        writeString('data');
+        view.setUint32(offset, dataSize, true); offset += 4; // Subchunk2Size
+
+        // Write PCM data
+        for (let i = 0; i < pcm16.length; i++, offset += 2) {{
+            view.setInt16(offset, pcm16[i], true);
+        }}
+
+        return new Blob([view], {{ type: 'audio/wav' }});
+    }}
+
+    async function generateNarrativeAudio() {{
+        button.disabled = true;
+        button.textContent = "Generating audio (1/3)...";
+        status.textContent = "Calling Gemini TTS API...";
+        audioPlayer.style.display = 'none';
+        
+        const payload = {{
+            contents: [{{ parts: [{{ text: NARRATIVE_TEXT }}] }}],
+            generationConfig: {{
+                responseModalities: ["AUDIO"],
+                speechConfig: {{
+                    voiceConfig: {{
+                        prebuiltVoiceConfig: {{ voiceName: VOICE_NAME }}
+                    }}
+                }}
+            }},
+            model: "gemini-2.5-flash-preview-tts"
+        }};
+
+        let attempts = 0;
+        const maxRetries = 3;
+        const baseDelay = 1000;
+
+        while (attempts < maxRetries) {{
+            try {{
+                const response = await fetch(API_URL, {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify(payload)
+                }});
+
+                if (!response.ok) {{
+                    if (response.status === 429) {{ // Rate Limit
+                        throw new Error("Rate limit exceeded.");
+                    }}
+                    throw new Error(`API call failed: ${{response.status}} ${{response.statusText}}`);
+                }}
+                
+                const result = await response.json();
+                
+                const part = result?.candidates?.[0]?.content?.parts?.[0];
+                const audioData = part?.inlineData?.data;
+                const mimeType = part?.inlineData?.mimeType;
+
+                if (audioData && mimeType && mimeType.startsWith("audio/L16")) {{
+                    status.textContent = "Processing audio data (2/3)...";
+                    const pcmDataBuffer = base64ToArrayBuffer(audioData);
+                    const pcm16 = new Int16Array(pcmDataBuffer);
+                    const sampleRate = 16000; 
+
+                    status.textContent = "Converting to WAV (3/3)...";
+                    const wavBlob = pcmToWav(pcm16, sampleRate);
+                    const audioUrl = URL.createObjectURL(wavBlob);
+                    
+                    audioPlayer.src = audioUrl;
+                    audioPlayer.style.display = 'block';
+                    button.textContent = "🔊 Narration Ready";
+                    status.textContent = "Press play above to listen to the explanation.";
+                    return; // Success, exit function
+                }} else {{
+                    throw new Error("Invalid or missing audio data in API response.");
+                }}
+
+            }} catch (error) {{
+                attempts++;
+                if (attempts >= maxRetries) {{
+                    status.textContent = `Final Error: ${{error.message}}. Generation failed.`;
+                }} else {{
+                    const delay = baseDelay * (2 ** (attempts - 1));
+                    // Note: In this environment, we avoid console logging retries.
+                    status.textContent = `Attempt ${attempts}/${maxRetries} failed. Retrying in ${delay / 1000}s...`;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }}
+            }}
+        }}
+
+    }}
+
+    button.addEventListener('click', generateNarrativeAudio);
+
+</script>
+"""
+components.html(TTS_HTML_COMPONENT, height=120)
 
 # --- 4. Input Sidebar ---
 with st.sidebar:
