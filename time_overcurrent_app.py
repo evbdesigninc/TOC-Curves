@@ -39,7 +39,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("Time-Overcurrent Relay (IDMT) Simulator")
+st.header("Time-Overcurrent Relay (IDMT) Simulator") # MODIFIED: Using st.header instead of st.title
 st.markdown("Use the sidebar to adjust relay settings and visualize the tripping curve.")
 
 # --- 4. Input Sidebar ---
@@ -114,7 +114,7 @@ else:
 
 # --- 6. Plotting the Curve (Updated to use Current on X-axis) ---
 
-st.header(f"Characteristic Curve: {curve['name']}")
+st.subheader(f"Characteristic Curve: {curve['name']}") # MODIFIED: Using st.subheader instead of st.header
 
 # Define plot ranges in Amperes based on I_pickup
 max_psm_limit = 10.0 # Common max limit for plotting IDMT curves
