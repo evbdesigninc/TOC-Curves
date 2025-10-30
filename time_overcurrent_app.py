@@ -179,16 +179,17 @@ if psm_test > 1.0:
             (plot_current, trip_time_to_plot_ms),
             textcoords="offset points",
             xytext=(10, 5),
-            ha='center'
+            ha='center',
+            fontsize=8 # Reduced annotation font size
         )
 
 # Add a vertical line for the Pickup Current (I_pickup)
 ax.axvline(x=i_pickup, color='r', linestyle='--', label=f'$I_{{pickup}}$ ({i_pickup:.0f} A)')
 
 # Style the plot
-ax.set_title("Operating Time vs. Fault Current (I_fault)")
-ax.set_xlabel("Fault Current ($I_{fault}$, A)", fontsize=12)
-ax.set_ylabel("Operating Time (ms)", fontsize=12)
+ax.set_title("Operating Time vs. Fault Current (I_fault)", fontsize=10) # Reduced title font size
+ax.set_xlabel("Fault Current ($I_{fault}$, A)", fontsize=10) # Reduced label font size
+ax.set_ylabel("Operating Time (ms)", fontsize=10) # Reduced label font size
 
 # Set axis limits
 x_lim_max = max(max_current_plot, min_current_plot_start + 100) # Ensure a minimum visible plot width
@@ -203,7 +204,7 @@ ax.yaxis.set_major_locator(MultipleLocator(1000)) # Major ticks every 1000 ms (1
 ax.yaxis.set_minor_locator(MultipleLocator(200)) # Minor ticks every 200 ms
 
 ax.grid(True, linestyle='--', alpha=0.6)
-ax.legend()
+ax.legend(fontsize=8) # Reduced legend font size
 
 # Display the plot in Streamlit
 st.pyplot(fig)
