@@ -117,21 +117,21 @@ else:
 st.header(f"Characteristic Curve: {curve['name']}")
 
 # Define plot ranges in Amperes based on I_pickup
-min_psm_limit = 1.1 # Ensures PSM > 1.0
 max_psm_limit = 10.0 # Common max limit for plotting IDMT curves
 
-# ADJUSTMENT 1: Max time for the y-axis (INCREASED to 10.0 s or 10000 ms)
+# ADJUSTMENT 1: Max time for the y-axis (10.0 s or 10000 ms)
 max_time_plot = 10.0 
 
-min_current_plot = i_pickup * min_psm_limit
+# Define the starting current for the curve data exactly at I_pickup
+min_current_plot_start = i_pickup 
 
 # ADJUSTMENT 2: Hard limit of 2000 A for the X-axis maximum
 max_current_plot_calc = i_pickup * max_psm_limit 
-max_current_plot_limit = 2000.0 # ADJUSTED: Plot limit changed to 2000.0 A
+max_current_plot_limit = 2000.0 
 max_current_plot = min(max_current_plot_calc, max_current_plot_limit)
 
 # Generate I_fault points for the curve plot
-current_values = np.linspace(min_current_plot, max_current_plot, 100)
+current_values = np.linspace(min_current_plot_start, max_current_plot, 100)
 
 # Calculate PSM for each current point
 psm_for_plot = current_values / i_pickup
@@ -139,7 +139,12 @@ psm_for_plot = current_values / i_pickup
 # Calculate times based on the new PSM values
 curve_times = [calculate_trip_time(psm, tms, curve) for psm in psm_for_plot]
 
-# Clamp curve times to the max plot time
+# **CRITICAL CHANGE**: Force the time at the exact I_pickup point (index 0) to max time
+# This ensures the characteristic curve visually starts at the top of the plot line.
+if len(curve_times) > 0:
+    curve_times[0] = max_time_plot
+
+# Clamp all curve times to the max plot time
 curve_times_clamped = np.clip(curve_times, a_min=0, a_max=max_time_plot)
 
 
@@ -186,12 +191,11 @@ ax.set_xlabel("Fault Current ($I_{fault}$, A)", fontsize=12)
 ax.set_ylabel("Operating Time (ms)", fontsize=12)
 
 # Set axis limits
-x_lim_max = max(max_current_plot, min_current_plot + 100) # Ensure a minimum visible plot width
-ax.set_xlim(min_current_plot, x_lim_max)
+x_lim_max = max(max_current_plot, min_current_plot_start + 100) # Ensure a minimum visible plot width
+ax.set_xlim(i_pickup, x_lim_max) # Start X-axis visibly at I_pickup
 ax.set_ylim(0, max_time_plot * 1000)
 
 # ADJUSTMENT 3: Update X and Y-axis ticks
-# Changed X-axis major/minor ticks to better fit the new 2000A range (optional, but helpful for 2000A)
 ax.xaxis.set_major_locator(MultipleLocator(400)) # Major ticks every 400 A
 ax.xaxis.set_minor_locator(MultipleLocator(100)) # Minor ticks every 100 A
 
