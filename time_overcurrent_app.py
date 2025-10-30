@@ -42,7 +42,7 @@ st.set_page_config(
 st.header("Time-Overcurrent Relay (IDMT) Simulator")
 st.markdown("Use the sidebar to adjust relay settings and visualize the tripping curve.")
 
-# --- 3.1. TTS Component (NEW SECTION) ---
+# --- 3.1. TTS Component (FIXED STRING INTERPOLATION) ---
 NARRATIVE_TEXT = """
 Welcome to the Time Overcurrent Relay Simulator. This tool visualizes the inverse definite minimum time, or IDMT, characteristic curve, which is the core of modern power system protection. The curve shows the trip time needed for a given fault current. 
 
@@ -80,7 +80,7 @@ TTS_HTML_COMPONENT = f"""
     const button = document.getElementById('narrateButton');
     const audioPlayer = document.getElementById('audioPlayer');
     const status = document.getElementById('status');
-    const VOICE_NAME = 'Kore'; // Changed to 'Kore' for stability
+    const VOICE_NAME = 'Kore'; 
 
     function base64ToArrayBuffer(base64) {{
         const binaryString = atob(base64);
@@ -139,6 +139,9 @@ TTS_HTML_COMPONENT = f"""
     }}
 
     async function generateNarrativeAudio() {{
+        const maxRetries = 3; // Defined here
+        const baseDelay = 1000; // Defined here
+        
         try {{
             button.disabled = true;
             button.textContent = "Generating audio (1/3)...";
@@ -158,9 +161,7 @@ TTS_HTML_COMPONENT = f"""
                 model: "gemini-2.5-flash-preview-tts"
             }};
 
-            let attempts = 0;
-            const maxRetries = 3;
-            const baseDelay = 1000;
+            let attempts = 0; // Defined here
 
             while (attempts < maxRetries) {{
                 try {{
@@ -174,7 +175,7 @@ TTS_HTML_COMPONENT = f"""
                         if (response.status === 429) {{ // Rate Limit
                             throw new Error("Rate limit exceeded.");
                         }}
-                        throw new Error(`API call failed: ${{response.status}} ${{response.statusText}}`);
+                        throw new Error('API call failed: ' + response.status + ' ' + response.statusText);
                     }}
                     
                     const result = await response.json();
@@ -205,11 +206,13 @@ TTS_HTML_COMPONENT = f"""
                 }} catch (error) {{
                     attempts++;
                     if (attempts >= maxRetries) {{
-                        status.textContent = `Final Error after ${maxRetries} tries: ${error.message}`;
+                        // FIXED: Replaced template literal with concatenation
+                        status.textContent = 'Final Error after ' + maxRetries + ' tries: ' + error.message;
                         throw error; // Re-throw to be caught by the outer block
                     }} else {{
                         const delay = baseDelay * (2 ** (attempts - 1));
-                        status.textContent = `Attempt ${attempts}/${maxRetries} failed: ${error.message}. Retrying in ${delay / 1000}s...`;
+                        // FIXED: Replaced template literal with concatenation
+                        status.textContent = 'Attempt ' + attempts + '/' + maxRetries + ' failed: ' + error.message + '. Retrying in ' + (delay / 1000) + 's...'; 
                         await new Promise(resolve => setTimeout(resolve, delay));
                     }}
                 }}
@@ -218,7 +221,7 @@ TTS_HTML_COMPONENT = f"""
             // Catches errors from the outer block (e.g., final failure of fetch attempts)
             button.disabled = false;
             button.textContent = "▶️ Start Narration";
-            // status.textContent is already set by the inner loop, but reset button state
+            // The status text is already set by the inner loop's final error message.
         }}
     }}
 
