@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.ticker import MultipleLocator
-import streamlit.components.v1 as components # NEW IMPORT
+import streamlit.components.v1 as components 
 
 # --- 1. Relay Constants (Translated from JavaScript) ---
 # Formula: t = TMS * [ A / ((PSM)^P - 1) ]
@@ -37,7 +37,6 @@ def calculate_trip_time(psm, tms, constants):
 
 st.set_page_config(
     page_title="Time Overcurrent Relay Simulator",
-    # MODIFIED: Removed layout="wide" to use Streamlit's default narrow/centered layout for better mobile fit
 )
 
 st.header("Time-Overcurrent Relay (IDMT) Simulator")
@@ -65,6 +64,14 @@ TTS_HTML_COMPONENT = f"""
 <p id="status" style="margin-top: 5px; font-size: 0.85em; color: #888;">Click to generate narration.</p>
 
 <script>
+    // Global Error Handler for unhandled JS exceptions
+    window.onerror = function(message, source, lineno, colno, error) {{
+        document.getElementById('status').textContent = 'Fatal Script Error: ' + message;
+        document.getElementById('narrateButton').disabled = false;
+        document.getElementById('narrateButton').textContent = "Script Error";
+        return true; 
+    }};
+    
     // Constants and Setup
     const NARRATIVE_TEXT = `{NARRATIVE_TEXT}`;
     // The API URL is appended with the key during runtime by the environment.
@@ -73,7 +80,7 @@ TTS_HTML_COMPONENT = f"""
     const button = document.getElementById('narrateButton');
     const audioPlayer = document.getElementById('audioPlayer');
     const status = document.getElementById('status');
-    const VOICE_NAME = 'Rasalgethi'; // Knowledgeable voice
+    const VOICE_NAME = 'Kore'; // Changed to 'Kore' for stability
 
     function base64ToArrayBuffer(base64) {{
         const binaryString = atob(base64);
@@ -132,81 +139,87 @@ TTS_HTML_COMPONENT = f"""
     }}
 
     async function generateNarrativeAudio() {{
-        button.disabled = true;
-        button.textContent = "Generating audio (1/3)...";
-        status.textContent = "Calling Gemini TTS API...";
-        audioPlayer.style.display = 'none';
-        
-        const payload = {{
-            contents: [{{ parts: [{{ text: NARRATIVE_TEXT }}] }}],
-            generationConfig: {{
-                responseModalities: ["AUDIO"],
-                speechConfig: {{
-                    voiceConfig: {{
-                        prebuiltVoiceConfig: {{ voiceName: VOICE_NAME }}
+        try {{
+            button.disabled = true;
+            button.textContent = "Generating audio (1/3)...";
+            status.textContent = "Calling Gemini TTS API...";
+            audioPlayer.style.display = 'none';
+            
+            const payload = {{
+                contents: [{{ parts: [{{ text: NARRATIVE_TEXT }}] }}],
+                generationConfig: {{
+                    responseModalities: ["AUDIO"],
+                    speechConfig: {{
+                        voiceConfig: {{
+                            prebuiltVoiceConfig: {{ voiceName: VOICE_NAME }}
+                        }}
                     }}
-                }}
-            }},
-            model: "gemini-2.5-flash-preview-tts"
-        }};
+                }},
+                model: "gemini-2.5-flash-preview-tts"
+            }};
 
-        let attempts = 0;
-        const maxRetries = 3;
-        const baseDelay = 1000;
+            let attempts = 0;
+            const maxRetries = 3;
+            const baseDelay = 1000;
 
-        while (attempts < maxRetries) {{
-            try {{
-                const response = await fetch(API_URL, {{
-                    method: 'POST',
-                    headers: {{ 'Content-Type': 'application/json' }},
-                    body: JSON.stringify(payload)
-                }});
+            while (attempts < maxRetries) {{
+                try {{
+                    const response = await fetch(API_URL, {{
+                        method: 'POST',
+                        headers: {{ 'Content-Type': 'application/json' }},
+                        body: JSON.stringify(payload)
+                    }});
 
-                if (!response.ok) {{
-                    if (response.status === 429) {{ // Rate Limit
-                        throw new Error("Rate limit exceeded.");
+                    if (!response.ok) {{
+                        if (response.status === 429) {{ // Rate Limit
+                            throw new Error("Rate limit exceeded.");
+                        }}
+                        throw new Error(`API call failed: ${{response.status}} ${{response.statusText}}`);
                     }}
-                    throw new Error(`API call failed: ${{response.status}} ${{response.statusText}}`);
-                }}
-                
-                const result = await response.json();
-                
-                const part = result?.candidates?.[0]?.content?.parts?.[0];
-                const audioData = part?.inlineData?.data;
-                const mimeType = part?.inlineData?.mimeType;
-
-                if (audioData && mimeType && mimeType.startsWith("audio/L16")) {{
-                    status.textContent = "Processing audio data (2/3)...";
-                    const pcmDataBuffer = base64ToArrayBuffer(audioData);
-                    const pcm16 = new Int16Array(pcmDataBuffer);
-                    const sampleRate = 16000; 
-
-                    status.textContent = "Converting to WAV (3/3)...";
-                    const wavBlob = pcmToWav(pcm16, sampleRate);
-                    const audioUrl = URL.createObjectURL(wavBlob);
                     
-                    audioPlayer.src = audioUrl;
-                    audioPlayer.style.display = 'block';
-                    button.textContent = "🔊 Narration Ready";
-                    status.textContent = "Press play above to listen to the explanation.";
-                    return; // Success, exit function
-                }} else {{
-                    throw new Error("Invalid or missing audio data in API response.");
-                }}
+                    const result = await response.json();
+                    
+                    const part = result?.candidates?.[0]?.content?.parts?.[0];
+                    const audioData = part?.inlineData?.data;
+                    const mimeType = part?.inlineData?.mimeType;
 
-            }} catch (error) {{
-                attempts++;
-                if (attempts >= maxRetries) {{
-                    status.textContent = `Final Error: ${{error.message}}. Generation failed.`;
-                }} else {{
-                    const delay = baseDelay * (2 ** (attempts - 1));
-                    // Note: In this environment, we avoid console logging retries.
-                    status.textContent = `Attempt ${attempts}/${maxRetries} failed. Retrying in ${delay / 1000}s...`;
-                    await new Promise(resolve => setTimeout(resolve, delay));
+                    if (audioData && mimeType && mimeType.startsWith("audio/L16")) {{
+                        status.textContent = "Processing audio data (2/3)...";
+                        const pcmDataBuffer = base64ToArrayBuffer(audioData);
+                        const pcm16 = new Int16Array(pcmDataBuffer);
+                        const sampleRate = 16000; 
+
+                        status.textContent = "Converting to WAV (3/3)...";
+                        const wavBlob = pcmToWav(pcm16, sampleRate);
+                        const audioUrl = URL.createObjectURL(wavBlob);
+                        
+                        audioPlayer.src = audioUrl;
+                        audioPlayer.style.display = 'block';
+                        button.textContent = "🔊 Narration Ready";
+                        status.textContent = "Press play above to listen to the explanation.";
+                        return; // Success, exit function
+                    }} else {{
+                        throw new Error("Invalid or missing audio data in API response structure.");
+                    }}
+
+                }} catch (error) {{
+                    attempts++;
+                    if (attempts >= maxRetries) {{
+                        status.textContent = `Final Error after ${maxRetries} tries: ${error.message}`;
+                        throw error; // Re-throw to be caught by the outer block
+                    }} else {{
+                        const delay = baseDelay * (2 ** (attempts - 1));
+                        status.textContent = `Attempt ${attempts}/${maxRetries} failed: ${error.message}. Retrying in ${delay / 1000}s...`;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    }}
                 }}
             }}
+        }} catch (e) {{
+            // Catches errors from the outer block (e.g., final failure of fetch attempts)
+            button.disabled = false;
+            button.textContent = "▶️ Start Narration";
+            // status.textContent is already set by the inner loop, but reset button state
         }}
-
     }}
 
     button.addEventListener('click', generateNarrativeAudio);
@@ -309,7 +322,7 @@ curve_times_clamped = np.clip(curve_times, a_min=0, a_max=max_time_plot)
 
 
 # Create the plot
-fig, ax = plt.subplots(figsize=(5, 2.5)) # MODIFIED: Reduced figure width to 5 inches for mobile view
+fig, ax = plt.subplots(figsize=(5, 2.5)) # Figure size optimized for mobile portrait view
 
 # Plot the IDMT Curve (X-axis is now current_values in Amperes)
 ax.plot(current_values, curve_times_clamped * 1000, 
