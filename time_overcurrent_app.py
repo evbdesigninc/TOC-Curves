@@ -3,9 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.ticker import MultipleLocator
-import streamlit.components.v1 as components 
+# Removed: import streamlit.components.v1 as components 
 
-# --- 1. Relay Constants (Translated from JavaScript) ---
+# --- 1. Relay Constants ---
 # Formula: t = TMS * [ A / ((PSM)^P - 1) ]
 CURVE_CONSTANTS = {
     "normal_inverse": {"A": 0.14, "P": 0.02, "name": "IEC/IEEE Normal Inverse"},
@@ -14,7 +14,7 @@ CURVE_CONSTANTS = {
     "long_time_inverse": {"A": 120.0, "P": 1.0, "name": "IEC Long Time Inverse"},
 }
 
-# --- 2. Calculation Logic (Translated from JavaScript) ---
+# --- 2. Calculation Logic ---
 def calculate_trip_time(psm, tms, constants):
     """
     Calculates the operating time (t) for a given PSM, TMS, and curve constants.
@@ -42,194 +42,10 @@ st.set_page_config(
 st.header("Time-Overcurrent Relay (IDMT) Simulator")
 st.markdown("Use the sidebar to adjust relay settings and visualize the tripping curve.")
 
-# --- 3.1. TTS Component (FIXED STRING INTERPOLATION) ---
-NARRATIVE_TEXT = """
-Welcome to the Time Overcurrent Relay Simulator. This tool visualizes the inverse definite minimum time, or IDMT, characteristic curve, which is the core of modern power system protection. The curve shows the trip time needed for a given fault current. 
-
-On the vertical axis, you have the operating time in milliseconds, and on the horizontal axis, the fault current in amperes. You can control the two critical settings using the sliders in the sidebar. 
-
-First, the Pickup Current, or I-pickup, defines the minimum current required to start the relay timer. If the fault current is below this value, the relay will not trip. 
-
-Second, the Time Multiplier Setting, or TMS, shifts the curve vertically. A higher TMS means the relay will take longer to trip for any given fault current. 
-
-By changing these sliders, you adjust the coordination time, which is essential for safely isolating faults in the grid.
-"""
-
-TTS_HTML_COMPONENT = f"""
-<audio id="audioPlayer" controls style="width: 100%; display:none; margin-top: 10px;"></audio>
-<button id="narrateButton" 
-        style="padding: 8px 16px; border-radius: 4px; background-color: #10b981; color: white; border: none; cursor: pointer; font-weight: bold;">
-    ▶️ Start Narration
-</button>
-<p id="status" style="margin-top: 5px; font-size: 0.85em; color: #888;">Click to generate narration.</p>
-
-<script>
-    // Global Error Handler for unhandled JS exceptions
-    window.onerror = function(message, source, lineno, colno, error) {{
-        document.getElementById('status').textContent = 'Fatal Script Error: ' + message;
-        document.getElementById('narrateButton').disabled = false;
-        document.getElementById('narrateButton').textContent = "Script Error";
-        return true; 
-    }};
-    
-    // Constants and Setup
-    const NARRATIVE_TEXT = `{NARRATIVE_TEXT}`;
-    // The API URL is appended with the key during runtime by the environment.
-    const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key='; 
-
-    const button = document.getElementById('narrateButton');
-    const audioPlayer = document.getElementById('audioPlayer');
-    const status = document.getElementById('status');
-    const VOICE_NAME = 'Kore'; 
-
-    function base64ToArrayBuffer(base64) {{
-        const binaryString = atob(base64);
-        const len = binaryString.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) {{
-            bytes[i] = binaryString.charCodeAt(i);
-        }}
-        return bytes.buffer;
-    }}
-
-    function pcmToWav(pcm16, sampleRate = 16000) {{
-        // API returns signed PCM16 data
-        const numChannels = 1;
-        const bitsPerSample = 16;
-        const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
-        const blockAlign = numChannels * (bitsPerSample / 8);
-        const dataSize = pcm16.byteLength;
-        const buffer = new ArrayBuffer(44 + dataSize);
-        const view = new DataView(buffer);
-        let offset = 0;
-
-        // Helper to write string to DataView
-        function writeString(s) {{
-            for (let i = 0; i < s.length; i++) {{
-                view.setUint8(offset + i, s.charCodeAt(i));
-            }}
-            offset += s.length;
-        }}
-
-        // RIFF chunk
-        writeString('RIFF');
-        view.setUint32(offset, 36 + dataSize, true); offset += 4;
-        writeString('WAVE');
-
-        // fmt sub-chunk
-        writeString('fmt ');
-        view.setUint32(offset, 16, true); offset += 4; // Subchunk1Size
-        view.setUint16(offset, 1, true); offset += 2; // AudioFormat (1 for PCM)
-        view.setUint16(offset, numChannels, true); offset += 2; // NumChannels
-        view.setUint32(offset, sampleRate, true); offset += 4; // SampleRate
-        view.setUint32(offset, byteRate, true); offset += 4; // ByteRate
-        view.setUint16(offset, blockAlign, true); offset += 2; // BlockAlign
-        view.setUint16(offset, bitsPerSample, true); offset += 2; // BitsPerSample
-
-        // data sub-chunk
-        writeString('data');
-        view.setUint32(offset, dataSize, true); offset += 4; // Subchunk2Size
-
-        // Write PCM data
-        for (let i = 0; i < pcm16.length; i++, offset += 2) {{
-            view.setInt16(offset, pcm16[i], true);
-        }}
-
-        return new Blob([view], {{ type: 'audio/wav' }});
-    }}
-
-    async function generateNarrativeAudio() {{
-        const maxRetries = 3; // Defined here
-        const baseDelay = 1000; // Defined here
-        
-        try {{
-            button.disabled = true;
-            button.textContent = "Generating audio (1/3)...";
-            status.textContent = "Calling Gemini TTS API...";
-            audioPlayer.style.display = 'none';
-            
-            const payload = {{
-                contents: [{{ parts: [{{ text: NARRATIVE_TEXT }}] }}],
-                generationConfig: {{
-                    responseModalities: ["AUDIO"],
-                    speechConfig: {{
-                        voiceConfig: {{
-                            prebuiltVoiceConfig: {{ voiceName: VOICE_NAME }}
-                        }}
-                    }}
-                }},
-                model: "gemini-2.5-flash-preview-tts"
-            }};
-
-            let attempts = 0; // Defined here
-
-            while (attempts < maxRetries) {{
-                try {{
-                    const response = await fetch(API_URL, {{
-                        method: 'POST',
-                        headers: {{ 'Content-Type': 'application/json' }},
-                        body: JSON.stringify(payload)
-                    }});
-
-                    if (!response.ok) {{
-                        if (response.status === 429) {{ // Rate Limit
-                            throw new Error("Rate limit exceeded.");
-                        }}
-                        throw new Error('API call failed: ' + response.status + ' ' + response.statusText);
-                    }}
-                    
-                    const result = await response.json();
-                    
-                    const part = result?.candidates?.[0]?.content?.parts?.[0];
-                    const audioData = part?.inlineData?.data;
-                    const mimeType = part?.inlineData?.mimeType;
-
-                    if (audioData && mimeType && mimeType.startsWith("audio/L16")) {{
-                        status.textContent = "Processing audio data (2/3)...";
-                        const pcmDataBuffer = base64ToArrayBuffer(audioData);
-                        const pcm16 = new Int16Array(pcmDataBuffer);
-                        const sampleRate = 16000; 
-
-                        status.textContent = "Converting to WAV (3/3)...";
-                        const wavBlob = pcmToWav(pcm16, sampleRate);
-                        const audioUrl = URL.createObjectURL(wavBlob);
-                        
-                        audioPlayer.src = audioUrl;
-                        audioPlayer.style.display = 'block';
-                        button.textContent = "🔊 Narration Ready";
-                        status.textContent = "Press play above to listen to the explanation.";
-                        return; // Success, exit function
-                    }} else {{
-                        throw new Error("Invalid or missing audio data in API response structure.");
-                    }}
-
-                }} catch (error) {{
-                    attempts++;
-                    if (attempts >= maxRetries) {{
-                        // FIXED: Replaced template literal with concatenation
-                        status.textContent = 'Final Error after ' + maxRetries + ' tries: ' + error.message;
-                        throw error; // Re-throw to be caught by the outer block
-                    }} else {{
-                        const delay = baseDelay * (2 ** (attempts - 1));
-                        // FIXED: Replaced template literal with concatenation
-                        status.textContent = 'Attempt ' + attempts + '/' + maxRetries + ' failed: ' + error.message + '. Retrying in ' + (delay / 1000) + 's...'; 
-                        await new Promise(resolve => setTimeout(resolve, delay));
-                    }}
-                }}
-            }}
-        }} catch (e) {{
-            // Catches errors from the outer block (e.g., final failure of fetch attempts)
-            button.disabled = false;
-            button.textContent = "▶️ Start Narration";
-            // The status text is already set by the inner loop's final error message.
-        }}
-    }}
-
-    button.addEventListener('click', generateNarrativeAudio);
-
-</script>
-"""
-components.html(TTS_HTML_COMPONENT, height=120)
+# --- 3.1. TTS Component (REMOVED) ---
+# Removed: NARRATIVE_TEXT
+# Removed: TTS_HTML_COMPONENT
+# Removed: components.html(TTS_HTML_COMPONENT, height=120)
 
 # --- 4. Input Sidebar ---
 with st.sidebar:
