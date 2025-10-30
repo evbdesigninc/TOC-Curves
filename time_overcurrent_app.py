@@ -149,7 +149,7 @@ curve_times_clamped = np.clip(curve_times, a_min=0, a_max=max_time_plot)
 
 
 # Create the plot
-fig, ax = plt.subplots(figsize=(7, 3)) # MODIFIED: Reduced figure size from (9, 3.5) to (7, 3)
+fig, ax = plt.subplots(figsize=(7, 2.5)) # MODIFIED: Further reduced height to 2.5 inches
 
 # Plot the IDMT Curve (X-axis is now current_values in Amperes)
 ax.plot(current_values, curve_times_clamped * 1000, 
@@ -197,7 +197,7 @@ ax.set_xlim(i_pickup, x_lim_max) # Start X-axis visibly at I_pickup
 ax.set_ylim(0, max_time_plot * 1000)
 
 # ADJUSTMENT 3: Update X and Y-axis ticks
-ax.xaxis.set_major_locator(MultipleLocator(400)) # Major ticks every 400 A
+ax.xaxis.set_major_locator(MultipleLocator(500)) # Major ticks every 500 A (Adjusted for tighter plot)
 ax.xaxis.set_minor_locator(MultipleLocator(100)) # Minor ticks every 100 A
 
 ax.yaxis.set_major_locator(MultipleLocator(1000)) # Major ticks every 1000 ms (1 second)
